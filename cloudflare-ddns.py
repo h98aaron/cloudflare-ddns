@@ -13,6 +13,7 @@ CURRENT_DIR = path.dirname(path.realpath(__file__))
 # CLI
 parser = argparse.ArgumentParser('cloudflare-ddns.py')
 parser.add_argument('-z', '--zone', dest="zone", action="append", help="Zone name")
+parser.add_argument('-d', '--dir', dest="config_dir", action="append", help="Config dir path")
 args = parser.parse_args()
 
 # Logger
@@ -43,7 +44,7 @@ def main():
         return
 
     for zone in set(args.zone):
-        config_path = path.join(CURRENT_DIR, 'zones', zone + '.yml')
+        config_path = args.config_dir or path.join(CURRENT_DIR, 'zones', zone + '.yml')
         if not path.isfile(config_path):
             log.critical("Zone '{}' not found".format(zone))
             return
@@ -61,8 +62,7 @@ def main():
         # Create API authentication headers
         global API_HEADERS
         API_HEADERS = {
-            'X-Auth-Key': cf_api_key,
-            'X-Auth-Email': cf_email
+            'Authorization': "Bearer {}".format(cf_api_key)
         }
 
         # Get zone informations
@@ -70,9 +70,12 @@ def main():
             'name': cf_zone
         }
         r = requests.get(API_ENDPOINT + 'zones', headers=API_HEADERS, params=payload)
+        
         data = r.json().get('result')
+        
         if not data:
             log.critical("The zone '{}' was not found on your account".format(cf_zone))
+            log.debug(r.json())
             return
         cf_zone_uuid = data[0]['id']
         cf_zone_name = data[0]['name']
